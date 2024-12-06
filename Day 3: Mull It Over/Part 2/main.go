@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -19,136 +19,76 @@ func main() {
 	}
 
 	// Parse the input
-	reports := newReports(input)
-	fmt.Println(reports.countSafe())
+	instructions := newInstructions(input)
+	fmt.Println(instructions.exec())
 }
 
-type direction int
+type instructions []instruction
 
-const (
-	increasing direction = iota
-	decreasing
-)
+func newInstructions(input []byte) instructions {
+	matches := regexp.MustCompile(`(mul\(\d+,\d+\))|(don't\(\))|(do\(\))`).FindAll([]byte(input), -1)
+	if matches == nil {
+		panic("invalid input")
+	}
+	instructions := make(instructions, len(matches))
+	for i, match := range matches {
+		instructions[i] = newInstruction(match)
+	}
+	return instructions
+}
 
-const (
-	maxDampening = 1
-)
-
-type reports []report
-
-func newReports(input []byte) reports {
-	lines := strings.Split(string(input), "\n")
-	r := make(reports, 0, len(lines))
-	for _, line := range lines {
-		if line == "" {
+func (i instructions) exec() int64 {
+	var result int64
+	do := true
+	for _, instruction := range i {
+		if instruction.isDo {
+			do = true
 			continue
+		} else if instruction.isDont {
+			do = false
+			continue
+		} else {
+			if do {
+				result += instruction.x * instruction.y
+			}
 		}
-		r = append(r, newReport(line))
 	}
-	return r
+	return result
 }
 
-func (r reports) countSafe() int64 {
-	var count int64
-	for _, report := range r {
-		safe := report.isSafe(0)
-		if safe {
-			count++
-		}
-	}
-	return count
+type instruction struct {
+	isDo   bool
+	isDont bool
+	x      int64
+	y      int64
 }
 
-type report []int64
-
-func newReport(input string) report {
-	values := strings.Split(input, " ")
-	r := make(report, 0, len(values))
-	for _, value := range values {
-		i, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		r = append(r, int64(i))
-	}
-	return r
-}
-
-func (r report) isSafe(dampeningLevel int) bool {
-	if dampeningLevel > maxDampening {
-		return false
-	}
-	//space := ""
-	//for i := 0; i < dampeningLevel; i++ {
-	//	space += "    "
-	//}
-
-	dir := r.getDirection()
-
-	safe := true
-	for i := 0; i < len(r)-1; i++ {
-		if r[i] == r[i+1] {
-			safe = false
-			break
-		}
-		if dir == increasing && r[i] > r[i+1] {
-			safe = false
-			break
-		}
-		if dir == decreasing && r[i] < r[i+1] {
-			safe = false
-			break
-		}
-		if abs(r[i]-r[i+1]) > 3 {
-			safe = false
-			break
+// instructions input will either be "mul(X,Y)" or "don't()" or "do()"
+func newInstruction(input []byte) instruction {
+	if string(input) == "do()" {
+		return instruction{
+			isDo: true,
 		}
 	}
-
-	if safe {
-		return true
-	}
-
-	for i := 0; i < len(r); i++ {
-		r2 := r.without(i)
-		safe = r2.isSafe(dampeningLevel + 1)
-		if safe {
-			return true
+	if string(input) == "don't()" {
+		return instruction{
+			isDont: true,
 		}
 	}
-
-	return false
-}
-
-func (r report) getDirection() direction {
-	if len(r) < 2 || r[0] < r[1] {
-		return increasing
+	strs := regexp.MustCompile(`mul\((\d+),(\d+)\)`).FindSubmatch(input)
+	if len(strs) != 3 {
+		panic("invalid input")
 	}
-	return decreasing
-}
-
-func (r report) without(i int) report {
-	withoutI := make(report, 0, len(r)-1)
-	withoutI = append(withoutI, r[:i]...)
-	withoutI = append(withoutI, r[i+1:]...)
-	return withoutI
-}
-
-//func (r report) without(i int) report {
-//	if i < 0 || i >= len(r) {
-//		return r
-//	}
-//	withoutI := make(report, 0, len(r)-1)
-//	withoutI = append(withoutI, r[:i]...)
-//	if i < len(r)-1 {
-//		withoutI = append(withoutI, r[i+1:]...)
-//	}
-//	return withoutI
-//}
-
-func abs(x int64) int64 {
-	if x < 0 {
-		return -x
+	x, err := strconv.ParseInt(string(strs[1]), 10, 64)
+	if err != nil {
+		panic(err)
 	}
-	return x
+	y, err := strconv.ParseInt(string(strs[2]), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return instruction{
+		x: x,
+		y: y,
+	}
 }
