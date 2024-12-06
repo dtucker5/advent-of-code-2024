@@ -17,7 +17,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(newPuzzle(input).countCorrectlyOrdered())
+	fmt.Println(newPuzzle(input).orderAndCountIncorrectlyOrdered())
 }
 
 type puzzle struct {
@@ -32,10 +32,12 @@ func newPuzzle(input []byte) puzzle {
 	}
 }
 
-func (p puzzle) countCorrectlyOrdered() int64 {
+func (p puzzle) orderAndCountIncorrectlyOrdered() int64 {
 	count := int64(0)
 	for _, u := range p.updates {
-		if u.isCorrectlyOrdered(p.rules) {
+		if !u.isCorrectlyOrdered(p.rules) {
+			u = u.order(p.rules)
+			fmt.Println(u, u[len(u)/2])
 			count += u[len(u)/2]
 		}
 	}
@@ -144,5 +146,53 @@ func (u update) isCorrectlyOrdered(r rules) bool {
 
 		}
 	}
+	return true
+}
+
+func (u update) order(r rules) update {
+	ordered := make(update, len(u))
+	copy(ordered, u)
+
+	// Bubble sort to order the update according to the rules
+	for {
+		swapped := false
+		// Left to right pass
+		for j := 0; j < len(ordered)-1; j++ {
+			if !isInCorrectOrder(ordered[j], ordered[j+1], r) {
+				ordered[j], ordered[j+1] = ordered[j+1], ordered[j]
+				swapped = true
+			}
+		}
+		//// Right to left pass
+		//for j := len(ordered) - 1; j > 0; j-- {
+		//	if !isInCorrectOrder(ordered[j-1], ordered[j], r) {
+		//		ordered[j-1], ordered[j] = ordered[j], ordered[j-1]
+		//		swapped = true
+		//	}
+		//}
+		if !swapped {
+			break
+		}
+	}
+
+	fmt.Println("ordered", ordered)
+
+	return ordered
+}
+
+func isInCorrectOrder(a, b int64, r rules) bool {
+	// Check if there is a rule that b must be before a
+	for _, rule := range r.ruleMapByB[a] {
+		if rule.a == b {
+			return false
+		}
+	}
+	// Check if there is a rule that a must be before b
+	for _, rule := range r.ruleMapByA[a] {
+		if rule.b == b {
+			return true
+		}
+	}
+	// If no specific rule is found, assume a and b are in correct order
 	return true
 }
