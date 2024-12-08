@@ -8,16 +8,24 @@ import (
 )
 
 func main() {
-	input, err := os.ReadFile("Day 7: Bridge Repair/Part 1/input_example.txt")
+	input, err := os.ReadFile("Day 7: Bridge Repair/Part 1/input.txt")
 	if err != nil {
 		panic(err)
 	}
 
 	eqs := parseEquations(string(input))
-	for _, eq := range eqs {
-		fmt.Println(eq)
-	}
 
+	count := int64(0)
+	totalCalibrationResult := int64(0)
+	ops := []rune{'+', '*'}
+	for _, eq := range eqs {
+		if eq.canBeSolvedWithOperators(ops) {
+			count++
+			totalCalibrationResult += eq.testValue
+		}
+	}
+	fmt.Println(count)
+	fmt.Println(totalCalibrationResult)
 }
 
 type equations []equation
@@ -50,4 +58,37 @@ func parseEquation(input string) equation {
 		numbers = append(numbers, num)
 	}
 	return equation{testValue, numbers}
+}
+
+func (eq equation) canBeSolvedWithOperators(ops []rune) bool {
+	solvable := false
+	solveEquation(eq.numbers, ops, func(result int64) {
+		if result == eq.testValue {
+			solvable = true
+		}
+	})
+	return solvable
+}
+
+func solveEquation(numbers []int64, ops []rune, callback func(int64)) {
+	var generateCombinations func([]int64, []rune)
+	generateCombinations = func(nums []int64, currentOps []rune) {
+		if len(currentOps) == len(nums)-1 {
+			result := nums[0]
+			for i, op := range currentOps {
+				switch op {
+				case '+':
+					result += nums[i+1]
+				case '*':
+					result *= nums[i+1]
+				}
+			}
+			callback(result)
+			return
+		}
+		for _, op := range ops {
+			generateCombinations(nums, append(currentOps, op))
+		}
+	}
+	generateCombinations(numbers, []rune{})
 }
